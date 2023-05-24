@@ -1,116 +1,106 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter } from "react-router-dom";
 import "./App.css";
-import Home from "./Home";
-import SnackOrBoozeApi from "./Api";
 import JoblyApi from "./JoblyAPI";
 import NavBar from "./NavBar";
-import { Route, Switch } from "react-router-dom";
-import CompaniesJobsList from "./CompaniesJobsList";
-import Company from "./Company";
-import NewFoodForm from "./NewFoodForm";
+import Routes from "./Routes.js";
+import userContext from "./userContext";
+import useLocalStorage from "./hooks/useLocalStorage";
+import jwt from "jsonwebtoken";
+
+export const TOKEN_STORAGE_ID = "jobly-token";
 
 function App() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [snacks, setSnacks] = useState([]);
-  const [drinks, setDrinks] = useState([]);
-  const [companies, setCompanies] = useState([]);
-  const [jobs, setJobs] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [token, setToken] = useLocalStorage(TOKEN_STORAGE_ID);
+  const [isLoading, setIsLoading] = useState(false);
+  const [applicationIds, setApplicationIds] = useState(new Set([]));
 
-  useEffect(() => {
-    async function getSnacks() {
-      let snacks = await SnackOrBoozeApi.getSnacks();
-      setSnacks(snacks);
-      setIsLoading(false);
-    }
-    getSnacks();
-  }, []);
+  useEffect(
+    function loadUserInfo() {
+      console.debug("App useEffect loadUserInfo", "token=", token);
 
-  useEffect(() => {
-    async function getDrinks() {
-      let drinks = await SnackOrBoozeApi.getDrinks();
-      setDrinks(drinks);
-      setIsLoading(false);
-    }
-    getDrinks();
-  }, []);
+      async function getCurrentUser() {
+        if (token) {
+          try {
+            let { username } = jwt.decode(token);
+            // put the token on the Api class so it can use it to call the API.
+            JoblyApi.token = token;
+            let currentUser = await JoblyApi.getUser(username);
+            setCurrentUser(currentUser);
+            setApplicationIds(new Set(currentUser.applications));
+          } catch (err) {
+            console.error("App loadUserInfo: problem loading", err);
+            setCurrentUser(null);
+          }
+        }
+        setIsLoading(true);
+      }
 
-  useEffect(() => {
-    async function getCompanies() {
-      let companies = await JoblyApi.getCompanies();
-      setCompanies(companies);
-      // console.log(companies);
-      setIsLoading(false);
-    }
-    getCompanies();
-  }, []);
+      // set infoLoaded to false while async getCurrentUser runs; once the
+      // data is fetched (or even if an error happens!), this will be set back
+      // to false to control the spinner.
 
-  useEffect(() => {
-    async function getJobs() {
-      let jobs = await JoblyApi.getJobs();
-      setJobs(jobs);
-      // console.log(jobs);
       setIsLoading(false);
-    }
-    getJobs();
-  }, []);
+      getCurrentUser();
+    },
+    [token]
+  );
 
   async function getCompany(handle) {
-    let company = await JoblyApi.getCompany(handle);
-    setIsLoading(false);
+    const company = await JoblyApi.getCompany(handle);
     return company;
   }
 
-  async function addDrink(data) {
-    let newDrink = await SnackOrBoozeApi.addDrink(data);
-    console.log(newDrink);
-    setIsLoading(false);
+  async function register(data) {
+    try {
+      let token = await JoblyApi.register(data);
+      setToken(token);
+      return { success: true };
+    } catch (err) {
+      return { sucess: false, errors: err };
+    }
   }
 
-  async function addSnack(data) {
-    let newSnack = await SnackOrBoozeApi.addSnack(data);
-    console.log(newSnack);
-    setIsLoading(false);
+  async function login(data) {
+    try {
+      let token = await JoblyApi.login(data);
+      setToken(token);
+      return { success: true };
+    } catch (err) {
+      return { sucess: false, errors: err };
+    }
   }
 
-  if (isLoading) {
-    return <p>Loading &hellip;</p>;
+  function logout() {
+    setCurrentUser(null);
+    setToken(null);
   }
+
+  /** Checks if a job has been applied for. */
+  function hasAppliedToJob(id) {
+    return applicationIds.has(id);
+  }
+
+  /** Apply to a job: make API call and update set of application IDs. */
+  function applyToJob(id) {
+    if (hasAppliedToJob(id)) return;
+    JoblyApi.applyToJob(currentUser.username, id);
+    setApplicationIds(new Set([...applicationIds, id]));
+  }
+
+  if (!isLoading) return <h3>Loading...</h3>;
 
   return (
     <div className="App">
-      <BrowserRouter>
-        <NavBar />
-        <main>
-          <Switch>
-            <Route exact path="/">
-              <Home snacks={snacks} drinks={drinks} />
-            </Route>
-            <Route exact path="/companies">
-              <CompaniesJobsList companies={companies} title="Companies" />
-            </Route>
-            <Route path="/companies/:handle">
-              <Company
-                companies={companies}
-                cantFind="/companies"
-                getCompany={getCompany}
-              />
-            </Route>
-            <Route exact path="/jobs">
-              <CompaniesJobsList jobs={jobs} title="Jobs" />
-            </Route>
-            <Route path="/profile">
-              {/* <FoodItem items={drinks} cantFind="/drinks" /> */}
-            </Route>
-            <Route exact path="/new">
-              <NewFoodForm addDrink={addDrink} addSnack={addSnack} />
-            </Route>
-            <Route>
-              <p>Hmmm. I can't seem to find what you want.</p>
-            </Route>
-          </Switch>
-        </main>
-      </BrowserRouter>
+      <userContext.Provider
+        value={{ currentUser, setCurrentUser, hasAppliedToJob, applyToJob }}
+      >
+        <BrowserRouter>
+          <NavBar logout={logout} />
+          <Routes login={login} getCompany={getCompany} register={register} />
+        </BrowserRouter>
+      </userContext.Provider>
     </div>
   );
 }

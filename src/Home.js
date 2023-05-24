@@ -1,20 +1,34 @@
-import React from "react";
+import React, { useContext } from "react";
 import { Card, CardBody, CardTitle } from "reactstrap";
+import userContext from "./userContext";
+import Button from "react-bootstrap/Button";
+import { NavLink } from "react-router-dom";
 
-function Home({ snacks, drinks }) {
+function Home() {
+  const { currentUser } = useContext(userContext);
   return (
     <section className="col-md-8">
       <Card>
         <CardBody className="text-center">
           <CardTitle>
-            <h3 className="font-weight-bold">
-              Welcome to Silicon Valley's premier dive cafe!
-            </h3>
+            <h1 className="font-weight-bold">Jobly</h1>
           </CardTitle>
-          <h5>
-            We have a selection of {snacks.length} snacks and {drinks.length}{" "}
-            drinks to choose from!
-          </h5>
+          <p>All the jobs in one, convenient place.</p>
+          <h3>
+            {currentUser ? (
+              `Welcome back ${currentUser.firstName}`
+            ) : (
+              <>
+                {" "}
+                <NavLink to="/login">
+                  <Button variant="info">Login</Button>
+                </NavLink>{" "}
+                <NavLink to="/signup">
+                  <Button variant="info">Sign Up</Button>
+                </NavLink>
+              </>
+            )}
+          </h3>
         </CardBody>
       </Card>
     </section>

@@ -54,13 +54,49 @@ class JoblyApi {
     let res = await this.request(`jobs`);
     return res.jobs;
   }
-  // obviously, you'll add a lot here ...
-}
 
-// for now, put token ("testuser" / "password" on class)
-JoblyApi.token =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZ" +
-  "SI6InRlc3R1c2VyIiwiaXNBZG1pbiI6ZmFsc2UsImlhdCI6MTU5ODE1OTI1OX0." +
-  "FtrMwBQwe6Ue-glIFgz_Nf8XxRT2YecFCiSpYL0fCXc";
+  /** Register a user. */
+
+  static async register(data) {
+    let res = await this.request(`auth/register`, data, "post");
+    return res.token;
+  }
+
+  /** Logs in a user */
+
+  static async login(data) {
+    let res = await this.request(`auth/token`, data, "post");
+    return res.token;
+  }
+
+  /** Filters the companies with a search term. */
+
+  static async filterCompanies(query) {
+    let res = await this.request(`companies`, query);
+    return res;
+  }
+
+  /** Filters the jobs with a search term. */
+
+  static async filterJobs(query) {
+    let res = await this.request(`jobs`, query);
+    return res;
+  }
+
+  static async getUser(username) {
+    let res = await this.request(`users/${username}`);
+    return res.user;
+  }
+
+  static async updateUser(username, data) {
+    let res = await this.request(`users/${username}`, data, "patch");
+    return res.user;
+  }
+
+  static async applyToJob(username, jobId) {
+    let res = await this.request(`users/${username}/jobs/${jobId}`, {}, "post");
+    return res;
+  }
+}
 
 export default JoblyApi;
